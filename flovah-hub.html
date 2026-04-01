@@ -3338,6 +3338,17 @@ function hydrate() {
     if (r) projects = JSON.parse(r);
     else initSamples();
   } catch(e) { initSamples(); }
+  // Inject shared project data from URL if present (for GitHub Pages share links)
+  if (window._sharedProjectData) {
+    var sp = window._sharedProjectData;
+    // Check if project already exists, update it; otherwise add it
+    var existingIdx = projects.findIndex(function(pr) { return pr.id === sp.id; });
+    if (existingIdx >= 0) {
+      projects[existingIdx] = Object.assign(projects[existingIdx], sp);
+    } else {
+      projects.unshift(sp);
+    }
+  }
   // Ensure all milestone-based projects have milestones + synced progress
   projects.forEach(function(p) {
     if (p.customView === 'template' && !p.milestones) {
@@ -4358,6 +4369,44 @@ function generateShareToken(projectId) {
   return Math.abs(hash).toString(36);
 }
 
+// ── SHARE DATA ENCODING (for self-contained share links) ──
+function _encodeShareData(p) {
+  var payload = {
+    id: p.id,
+    name: p.name,
+    icon: p.icon,
+    color: p.color,
+    desc: p.desc,
+    pwHash: p.pwHash,
+    clientCredentials: p.clientCredentials,
+    savedTemplateHtml: p.savedTemplateHtml || '',
+    milestones: p.milestones || [],
+    tasks: p.tasks || [],
+    files: (p.files || []).map(function(f) { return { id: f.id, label: f.label, url: f.url }; }),
+    notes: p.notes || '',
+    progress: p.progress || 0,
+    autoProgress: p.autoProgress,
+    customView: p.customView || '',
+    createdAt: p.createdAt || Date.now()
+  };
+  var json = JSON.stringify(payload);
+  var encoded = btoa(unescape(encodeURIComponent(json)));
+  // If too large (>1.5MB), strip savedTemplateHtml to keep URL manageable
+  if (encoded.length > 1500000) {
+    payload.savedTemplateHtml = '';
+    json = JSON.stringify(payload);
+    encoded = btoa(unescape(encodeURIComponent(json)));
+  }
+  return encoded;
+}
+
+function _decodeShareData(encoded) {
+  try {
+    var json = decodeURIComponent(escape(atob(encoded)));
+    return JSON.parse(json);
+  } catch(e) { return null; }
+}
+
 function shareProject() {
   const p = getP(curPanelId);
   if (!p) return;
@@ -4474,10 +4523,11 @@ function generateShareCredentials() {
   p.clientCredentials = { username: username, password: password, accentColor: accentColor, editableFields: editableFields };
   persist();
 
-  // Generate share link
+  // Generate share link with embedded project data
   const token = generateShareToken(p.id);
-  const base = window.location.href.split('?')[0];
-  const shareUrl = base + '?client=' + encodeURIComponent(p.id) + '&token=' + token;
+  const shareData = _encodeShareData(p);
+  const base = 'https://flovah2024.github.io/flovah-hub/flovah-hub.html';
+  const shareUrl = base + '?client=' + encodeURIComponent(p.id) + '&token=' + token + '#d=' + shareData;
 
   // Show link section
   const linkSection = document.getElementById('shareLinkSection');
@@ -4959,6 +5009,17 @@ function clientSave() {
   if (params.client && params.token) {
     const expectedToken = generateShareToken(params.client);
     if (params.token === expectedToken) {
+      // Try to load embedded project data from URL hash
+      var hashStr = window.location.hash || '';
+      var dataMatch = hashStr.match(/^#d=(.+)$/);
+      if (dataMatch) {
+        var shareProject = _decodeShareData(dataMatch[1]);
+        if (shareProject) {
+          // Inject the shared project into projects array so enterClientMode can find it
+          shareProject.id = params.client; // ensure ID matches
+          window._sharedProjectData = shareProject;
+        }
+      }
       // Valid client link — enter client mode after hydrate
       window._pendingClientMode = params.client;
     } else {
