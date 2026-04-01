@@ -3675,11 +3675,16 @@ function doClientUnlock() {
   if (!pass) { showClientPwErr('Please enter your password.'); return; }
   if (user === p.clientCredentials.username && pass === p.clientCredentials.password) {
     closeOv('pwOverlay');
-    // Enter client mode for this project
+    // Enter client mode — NOT a preview, client has no dashboard access
+    window._isClientPreview = false;
+    window._isActualClient = true;
     window._clientProject = p;
     window._clientProjectId = p.id;
     const main = document.getElementById('main');
     if (main) main.style.display = 'none';
+    // Hide splash screen completely so client can't get back
+    const splash = document.getElementById('splash');
+    if (splash) splash.style.display = 'none';
     _showSplashTransition(p);
   } else {
     showClientPwErr('Incorrect username or password.');
@@ -4750,16 +4755,36 @@ function previewClientMode() {
 }
 
 function exitClientPreview() {
+  // Actual clients cannot exit to dashboard
+  if (window._isActualClient) return;
+  // Save any pending changes before exiting
+  if (window._clientProjectId) {
+    var proj = projects.find(function(pr) { return pr.id === window._clientProjectId; });
+    var frame = document.getElementById('clientFrame');
+    if (proj && frame) {
+      try {
+        if (frame.contentDocument) proj.savedTemplateHtml = frame.contentDocument.documentElement.outerHTML;
+        else if (window._clientLatestHtml) proj.savedTemplateHtml = window._clientLatestHtml;
+      } catch(e) {
+        if (window._clientLatestHtml) proj.savedTemplateHtml = window._clientLatestHtml;
+      }
+      persist();
+    }
+  }
   // Remove client elements
   const banner = document.querySelector('.client-banner');
   if (banner) banner.remove();
-  const frame = document.getElementById('clientFrame');
-  if (frame) frame.remove();
+  const fr = document.getElementById('clientFrame');
+  if (fr) fr.remove();
   const login = document.getElementById('clientLoginScreen');
   if (login) login.remove();
+  const splash = document.getElementById('clientSplashTransition');
+  if (splash) splash.remove();
   window._isClientPreview = false;
+  window._isActualClient = false;
   window._clientProject = null;
   window._clientProjectId = null;
+  window._clientLatestHtml = null;
   // Show hub again
   const main = document.getElementById('main');
   if (main) { main.style.display = 'flex'; }
@@ -4787,8 +4812,10 @@ function enterClientMode(projectId) {
     return;
   }
 
-  // Store for login check
+  // Store for login check — this is an actual client, no dashboard access
   window._clientProject = p;
+  window._isActualClient = true;
+  window._isClientPreview = false;
 
   // Hide the hub main area
   const main = document.getElementById('main');
@@ -5144,10 +5171,21 @@ function _buildClientView(p) {
   window._clientProjectId = p.id;
   window._clientLatestHtml = null;
 
-  // Listen for client edits
+  // Listen for client edits — auto-save to project + localStorage
+  var _clientAutoSaveDebounce = null;
   window.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'clientHtmlUpdate') {
       window._clientLatestHtml = e.data.html;
+      // Auto-save with debounce so changes persist immediately
+      clearTimeout(_clientAutoSaveDebounce);
+      _clientAutoSaveDebounce = setTimeout(function() {
+        if (!window._clientProjectId) return;
+        var proj = projects.find(function(pr) { return pr.id === window._clientProjectId; });
+        if (proj) {
+          proj.savedTemplateHtml = e.data.html;
+          persist();
+        }
+      }, 800);
     }
   });
 }
