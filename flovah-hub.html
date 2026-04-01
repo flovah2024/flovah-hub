@@ -1598,6 +1598,40 @@ textarea.form-input { min-height:80px; resize:vertical; line-height:1.6; }
       <div id="nMediaGrid" class="np-media-grid"></div>
     </div>
 
+    <!-- Client Access Section -->
+    <div style="margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.06);">
+      <label style="font-size:11px; color:var(--orange); letter-spacing:1.5px; text-transform:uppercase; font-weight:700; display:block; margin-bottom:12px;">🔗 Client Access</label>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Client Username *</label>
+          <input class="form-input" id="nClientUser" type="text" placeholder="e.g. client-name"/>
+        </div>
+        <div class="form-group">
+          <label>Client Password *</label>
+          <div class="input-wrap">
+            <input class="form-input" type="password" id="nClientPw" placeholder="Set client password" style="padding-right:42px"/>
+            <button class="eye-btn" onclick="toggleEye('nClientPw',this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:8px;">
+        <label>Accent Color</label>
+        <div id="nColorPicker" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="share-color-btn selected" data-color="#3b82f6" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid rgba(255,255,255,0.5); background:#3b82f6; cursor:pointer; transition:all 0.2s;" title="Blue"></button>
+          <button class="share-color-btn" data-color="#8b5cf6" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#8b5cf6; cursor:pointer; transition:all 0.2s;" title="Purple"></button>
+          <button class="share-color-btn" data-color="#10b981" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#10b981; cursor:pointer; transition:all 0.2s;" title="Green"></button>
+          <button class="share-color-btn" data-color="#ec4899" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#ec4899; cursor:pointer; transition:all 0.2s;" title="Pink"></button>
+          <button class="share-color-btn" data-color="#f59e0b" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#f59e0b; cursor:pointer; transition:all 0.2s;" title="Amber"></button>
+          <button class="share-color-btn" data-color="#06b6d4" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#06b6d4; cursor:pointer; transition:all 0.2s;" title="Cyan"></button>
+          <button class="share-color-btn" data-color="#ef4444" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#ef4444; cursor:pointer; transition:all 0.2s;" title="Red"></button>
+          <button class="share-color-btn" data-color="#6366f1" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#6366f1; cursor:pointer; transition:all 0.2s;" title="Indigo"></button>
+          <button class="share-color-btn" data-color="#e8713a" onclick="pickNewColor(this)" style="width:32px; height:32px; border-radius:8px; border:2px solid transparent; background:#e8713a; cursor:pointer; transition:all 0.2s;" title="Orange"></button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeOv('newOv')">Cancel</button>
       <button class="btn-create" onclick="createProject()">Create Project</button>
@@ -4228,9 +4262,16 @@ function openNewProject() {
   document.getElementById('nDesc').value='';
   document.getElementById('nPw').value='';
   document.getElementById('nPwC').value='';
+  document.getElementById('nClientUser').value='';
+  document.getElementById('nClientPw').value='';
   document.getElementById('nErr').style.display='none';
   document.getElementById('nMediaGrid').innerHTML='';
   document.querySelectorAll('#emojiRow .emoji-opt').forEach((e,i)=>e.classList.toggle('sel',i===0));
+  // Reset accent color to first option (blue)
+  document.querySelectorAll('#nColorPicker .share-color-btn').forEach(function(b, i) {
+    b.classList.toggle('selected', i === 0);
+    b.style.borderColor = i === 0 ? 'rgba(255,255,255,0.5)' : 'transparent';
+  });
   openOv('newOv');
   setTimeout(()=>document.getElementById('nName').focus(),320);
 }
@@ -4241,27 +4282,62 @@ function pickEmoji(el, em) {
   el.classList.add('sel');
 }
 
+function pickNewColor(btn) {
+  document.querySelectorAll('#nColorPicker .share-color-btn').forEach(function(b) {
+    b.classList.remove('selected');
+    b.style.borderColor = 'transparent';
+  });
+  btn.classList.add('selected');
+  btn.style.borderColor = 'rgba(255,255,255,0.5)';
+}
+
 function createProject() {
   const name = document.getElementById('nName').value.trim();
   const desc = document.getElementById('nDesc').value.trim();
   const pw = document.getElementById('nPw').value;
   const pwC = document.getElementById('nPwC').value;
+  const clientUser = document.getElementById('nClientUser').value.trim();
+  const clientPw = document.getElementById('nClientPw').value.trim();
   const err = document.getElementById('nErr');
 
   if (!name) { showNErr('Project name is required.'); return; }
   if (!pw) { showNErr('Password is required.'); return; }
   if (pw.length < 4) { showNErr('Password must be at least 4 characters.'); return; }
   if (pw !== pwC) { showNErr('Passwords do not match.'); return; }
+  if (!clientUser) { showNErr('Client username is required.'); return; }
+  if (!clientPw) { showNErr('Client password is required.'); return; }
+  if (clientPw.length < 3) { showNErr('Client password must be at least 3 characters.'); return; }
+
+  // Get selected accent color
+  const selColor = document.querySelector('#nColorPicker .share-color-btn.selected');
+  const accentColor = selColor ? selColor.dataset.color : '#3b82f6';
+
+  // Client permissions: calendar + files only by default
+  const clientCredentials = {
+    username: clientUser,
+    password: clientPw,
+    accentColor: accentColor,
+    editableFields: {
+      production: false,
+      phases: false,
+      calendar: true,
+      milestones: false,
+      contact: false,
+      footer: false
+    }
+  };
 
   const mediaFiles = newProjFiles.filter(Boolean); // remove nulls from deleted items
-  projects.unshift({
+  const newProj = {
     id:uid(), name, icon:newEmoji, color:'#e8713a',
     desc, pwHash:hp(pw),
     customView:'template',
     milestones:new Array(5).fill(false),
+    clientCredentials: clientCredentials,
     tasks:[], notes:'', progress:0, autoProgress:false,
     files: mediaFiles, createdAt:Date.now()
-  });
+  };
+  projects.unshift(newProj);
   persist(); closeOv('newOv'); render();
   showToast('🚀 "'+name+'" created!','ok');
 }
