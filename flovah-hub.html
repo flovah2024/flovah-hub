@@ -2482,16 +2482,22 @@ const PROJ_TPL = `<!DOCTYPE html>
   .tpl-upload-btn { background: var(--orange); color: #0a0a0a; border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; pointer-events: none; flex-shrink: 0; }
   .tpl-upload-btn:hover { background: #f0924e; }
   .tpl-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-  .tpl-media-item { border-radius: 10px; overflow: hidden; background: #0c0c0c; border: 1px solid rgba(255,255,255,0.06); position: relative; }
+  .tpl-media-item { border-radius: 10px; overflow: hidden; background: #0c0c0c; border: 1px solid rgba(255,255,255,0.06); position: relative; cursor: grab; transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s; }
+  .tpl-media-item.dragging { opacity: 0.4; transform: scale(0.95); }
+  .tpl-media-item.drag-over-item { border-color: var(--orange); box-shadow: 0 0 16px rgba(232,113,58,0.25); }
+  .tpl-media-item:active { cursor: grabbing; }
   .tpl-media-item .media-thumb { width: 100%; aspect-ratio: 16/9; position: relative; overflow: hidden; }
   .tpl-media-item img, .tpl-media-item video { width: 100%; height: 100%; aspect-ratio: 16/9; object-fit: contain; background: #000; display: block; }
   .tpl-media-title { width: 100%; background: transparent; border: none; color: #fff; font-size: 12px; font-weight: 600; font-family: 'Noto Sans', sans-serif; padding: 8px 10px 2px; outline: none; border-top: 1px solid rgba(255,255,255,0.05); text-overflow: ellipsis; box-sizing: border-box; }
   .tpl-media-title:empty::before { content: attr(data-placeholder); color: rgba(255,255,255,0.2); }
   .tpl-media-subtitle { width: 100%; background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 10px; font-family: 'Noto Sans', sans-serif; padding: 0 10px 8px; outline: none; text-overflow: ellipsis; box-sizing: border-box; }
   .tpl-media-subtitle:empty::before { content: attr(data-placeholder); color: rgba(255,255,255,0.15); }
-  .tpl-media-delete-btn { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; color: #fff; font-size: 12px; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s; }
-  .tpl-media-item:hover .tpl-media-delete-btn { display: flex; }
+  .tpl-media-delete-btn, .tpl-media-download-btn { position: absolute; top: 6px; width: 24px; height: 24px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; color: #fff; font-size: 12px; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s; }
+  .tpl-media-delete-btn { right: 6px; }
+  .tpl-media-download-btn { right: 34px; }
+  .tpl-media-item:hover .tpl-media-delete-btn, .tpl-media-item:hover .tpl-media-download-btn { display: flex; }
   .tpl-media-delete-btn:hover { background: #ef4444; border-color: #ef4444; }
+  .tpl-media-download-btn:hover { background: var(--orange); border-color: var(--orange); }
   .tpl-video-badge { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.7); border-radius: 4px; padding: 2px 6px; font-size: 9px; color: var(--orange); font-weight: 700; letter-spacing: 0.05em; pointer-events: none; }
   .video-thumb-wrap { position: relative; width: 100%; height: 100%; cursor: pointer; }
   .video-thumb-wrap img { width: 100%; height: 100%; object-fit: contain; background: #000; }
@@ -3241,13 +3247,26 @@ function renderMediaItem(f, idx) {
   if (f.type === 'image') { var img = document.createElement('img'); img.src = f.data; img.alt = f.name || ''; thumb.appendChild(img); }
   else if (f.thumbnail) { var vwrap = document.createElement('div'); vwrap.className = 'video-thumb-wrap'; vwrap.innerHTML = '<img src="' + f.thumbnail + '" alt="thumbnail"><div class="video-play-overlay"></div>'; vwrap.dataset.videoSrc = f.data; vwrap.onclick = function() { var wrap = this; var vid = document.createElement('video'); vid.src = wrap.dataset.videoSrc; vid.controls = true; vid.playsInline = true; vid.preload = 'metadata'; vid.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;'; vid.addEventListener('ended', function() { this.currentTime = 0; this.pause(); wrap.style.display = ''; vid.remove(); }); wrap.parentElement.appendChild(vid); wrap.style.display = 'none'; vid.play(); }; thumb.appendChild(vwrap); var badge = document.createElement('div'); badge.className = 'tpl-video-badge'; badge.textContent = 'VIDEO'; thumb.appendChild(badge); }
   else { var video = document.createElement('video'); video.src = f.data; video.controls = false; video.preload = 'metadata'; video.playsInline = true; video.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;cursor:pointer;'; var playBtn = document.createElement('div'); playBtn.className = 'video-play-overlay'; playBtn.title = 'Play'; playBtn.onclick = function(e) { e.stopPropagation(); video.controls = true; video.play(); playBtn.style.display = 'none'; }; video.addEventListener('pause', function() { playBtn.style.display = ''; }); video.addEventListener('ended', function() { playBtn.style.display = ''; video.controls = false; this.currentTime = 0; }); var badge2 = document.createElement('div'); badge2.className = 'tpl-video-badge'; badge2.textContent = 'VIDEO'; thumb.appendChild(video); thumb.appendChild(playBtn); thumb.appendChild(badge2); }
+  /* Download button */
+  var dlBtn = document.createElement('button'); dlBtn.className = 'tpl-media-download-btn'; dlBtn.title = 'Download';
+  dlBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  dlBtn.onclick = function(e) { e.stopPropagation(); var ci = parseInt(item.dataset.idx); var mf = tplMediaFiles[ci]; if (!mf) return; var a = document.createElement('a'); a.href = mf.data; a.download = mf.title || mf.name || ('file_' + ci); document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+  thumb.appendChild(dlBtn);
+  /* Delete button */
   var delBtn = document.createElement('button'); delBtn.className = 'tpl-media-delete-btn'; delBtn.textContent = '\u2715';
   delBtn.onclick = function(e) { e.stopPropagation(); var i = parseInt(item.dataset.idx); tplMediaFiles.splice(i, 1); renderAllMedia(); notifyParentFiles(); };
   thumb.appendChild(delBtn); item.appendChild(thumb);
-  var titleEl = document.createElement('div'); titleEl.className = 'tpl-media-title'; titleEl.contentEditable = 'true'; titleEl.setAttribute('data-placeholder', 'Add title...'); titleEl.textContent = f.title || f.name || ''; titleEl.dataset.idx = idx;
+  /* Drag attributes */
+  item.draggable = true;
+  item.addEventListener('dragstart', function(e) { var t = e.target; if (t.contentEditable === 'true' || t.tagName === 'BUTTON' || t.tagName === 'INPUT' || t.closest('.tpl-media-delete-btn') || t.closest('.tpl-media-download-btn')) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', idx); this.classList.add('dragging'); });
+  item.addEventListener('dragend', function() { this.classList.remove('dragging'); document.querySelectorAll('.tpl-media-item.drag-over-item').forEach(function(el) { el.classList.remove('drag-over-item'); }); });
+  item.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over-item'); });
+  item.addEventListener('dragleave', function() { this.classList.remove('drag-over-item'); });
+  item.addEventListener('drop', function(e) { e.preventDefault(); this.classList.remove('drag-over-item'); var fromIdx = parseInt(e.dataTransfer.getData('text/plain')); var toIdx = parseInt(this.dataset.idx); if (fromIdx === toIdx || isNaN(fromIdx) || isNaN(toIdx)) return; var moved = tplMediaFiles.splice(fromIdx, 1)[0]; tplMediaFiles.splice(toIdx, 0, moved); renderAllMedia(); notifyParentFiles(); });
+  var titleEl = document.createElement('div'); titleEl.className = 'tpl-media-title'; titleEl.contentEditable = 'true'; titleEl.draggable = false; titleEl.setAttribute('data-placeholder', 'Add title...'); titleEl.textContent = f.title || f.name || ''; titleEl.dataset.idx = idx;
   titleEl.onblur = function() { var ci = parseInt(this.dataset.idx); if (tplMediaFiles[ci]) { tplMediaFiles[ci].title = this.textContent.trim(); notifyParentFiles(); } };
   titleEl.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); this.blur(); } }; item.appendChild(titleEl);
-  var subEl = document.createElement('div'); subEl.className = 'tpl-media-subtitle'; subEl.contentEditable = 'true'; subEl.setAttribute('data-placeholder', 'Add description...'); subEl.textContent = f.caption || ''; subEl.dataset.idx = idx;
+  var subEl = document.createElement('div'); subEl.className = 'tpl-media-subtitle'; subEl.contentEditable = 'true'; subEl.draggable = false; subEl.setAttribute('data-placeholder', 'Add description...'); subEl.textContent = f.caption || ''; subEl.dataset.idx = idx;
   subEl.onblur = function() { var ci = parseInt(this.dataset.idx); if (tplMediaFiles[ci]) { tplMediaFiles[ci].caption = this.textContent.trim(); notifyParentFiles(); } };
   subEl.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); this.blur(); } }; item.appendChild(subEl);
   return item;
@@ -3306,8 +3325,6 @@ function hydrate() {
     if (r) projects = JSON.parse(r);
     else initSamples();
   } catch(e) { initSamples(); }
-  // Always ensure MobED Beijing project exists
-  injectMobED();
   // Ensure all milestone-based projects have milestones + synced progress
   projects.forEach(function(p) {
     if (p.customView === 'template' && !p.milestones) {
@@ -3318,48 +3335,6 @@ function hydrate() {
       p.autoProgress = false;
     }
   });
-}
-
-function injectMobED() {
-  // If exists but missing customView flag, add it and persist
-  const existing = projects.find(p => p.name === 'MobED Beijing 2026');
-  if (existing) {
-    let changed = false;
-    if (!existing.customView) { existing.customView = 'mobed-beijing'; changed = true; }
-    if (!existing.milestones) { existing.milestones = [true,false,false,false,false]; changed = true; }
-    if (changed) persist();
-    return;
-  }
-  const mobed = {
-    id:uid(), name:'MobED Beijing 2026', icon:'🎬', color:'#e8713a',
-    desc:'AI Content Video Production — Beijing Motor Show 2026. Full production schedule from research to final delivery.',
-    pwHash:hp('mobed2026'),
-    customView:'mobed-beijing',
-    milestones:[true,false,false,false,false],
-    tasks:[
-      {id:uid(),text:'[Phase 1] Project Kick-off & Research Setup',done:true},
-      {id:uid(),text:'[Phase 1] Mobility Reference Study',done:true},
-      {id:uid(),text:'[Phase 1] Space & Character Reference Study',done:true},
-      {id:uid(),text:'[Phase 1] Research Summary',done:true},
-      {id:uid(),text:'[Phase 2] Urban Hopper Production Start',done:true},
-      {id:uid(),text:'[Phase 2] Urban Hopper AI Video Production',done:false},
-      {id:uid(),text:'[Phase 2] Golf Series AI Video Production',done:false},
-      {id:uid(),text:'[Phase 3] 2nd Draft — Press Conference Video',done:false},
-      {id:uid(),text:'[Phase 3] Client Review Round 1',done:false},
-      {id:uid(),text:'[Phase 4] 3rd Draft — Final Edit & Revision',done:false},
-      {id:uid(),text:'[Phase 4] Final client revisions',done:false},
-      {id:uid(),text:'[Final] Final Review & Approval',done:false},
-      {id:uid(),text:'[Final] Delivery to Beijing Motor Show',done:false},
-    ],
-    notes:'FLOVAH Production Portal — Beijing Motor Show 2026\nAI Content Video Production Schedule\n\n— Phase 1: Research & Study (3/24–3/27)\n— Phase 2: 1st Draft — Urban Hopper & Golf (3/30–4/3)\n— Phase 3: 2nd Draft — Press Conference (4/6–4/10)\n— Phase 4: 3rd Draft — Final Edit & Revision (4/13–4/17)\n— Final: Review & Delivery (4/20–4/21)\n\nContact: Director Eunjun Kim\ngim@flovah.com · 010-5188-1988\n\nPrepared by FLOVAH · Last updated: 2026.03.30',
-    progress:35, autoProgress:true,
-    files:[
-      {id:uid(),label:'Production Schedule (Beijing)',url:'https://flovah2024.github.io/mobed-beijing/'},
-    ],
-    createdAt:Date.now()
-  };
-  projects.unshift(mobed);
-  persist();
 }
 
 // ── UTILS ─────────────────────────────────────────────
@@ -3417,83 +3392,7 @@ function getProgress(p) {
 
 // ── SAMPLES ───────────────────────────────────────────
 function initSamples() {
-  projects = [
-    {
-      id:uid(), name:'MobED Beijing 2026', icon:'🎬', color:'#e8713a',
-      desc:'AI Content Video Production — Beijing Motor Show 2026. Full production schedule from research to final delivery.',
-      pwHash:hp('mobed2026'),
-      tasks:[
-        {id:uid(),text:'[Phase 1] Project Kick-off & Research Setup',done:true},
-        {id:uid(),text:'[Phase 1] Mobility Reference Study',done:true},
-        {id:uid(),text:'[Phase 1] Space & Character Reference Study',done:true},
-        {id:uid(),text:'[Phase 1] Research Summary',done:true},
-        {id:uid(),text:'[Phase 2] Urban Hopper Production Start',done:true},
-        {id:uid(),text:'[Phase 2] Urban Hopper AI Video Production',done:false},
-        {id:uid(),text:'[Phase 2] Golf Series AI Video Production',done:false},
-        {id:uid(),text:'[Phase 3] 2nd Draft — Press Conference Video',done:false},
-        {id:uid(),text:'[Phase 3] Client Review Round 1',done:false},
-        {id:uid(),text:'[Phase 4] 3rd Draft — Final Edit & Revision',done:false},
-        {id:uid(),text:'[Phase 4] Final client revisions',done:false},
-        {id:uid(),text:'[Final] Final Review & Approval',done:false},
-        {id:uid(),text:'[Final] Delivery to Beijing Motor Show',done:false},
-      ],
-      notes:'FLOVAH Production Portal — Beijing Motor Show 2026\nAI Content Video Production Schedule\n\n— Phase 1: Research & Study (3/24–3/27)\n— Phase 2: 1st Draft — Urban Hopper & Golf (3/30–4/3)\n— Phase 3: 2nd Draft — Press Conference (4/6–4/10)\n— Phase 4: 3rd Draft — Final Edit & Revision (4/13–4/17)\n— Final: Review & Delivery (4/20–4/21)\n\nContact: Director Eunjun Kim\ngim@flovah.com · 010-5188-1988\n\nPrepared by FLOVAH · Last updated: 2026.03.30',
-      progress:35, autoProgress:true,
-      files:[
-        {id:uid(),label:'Production Schedule (Beijing)',url:'https://flovah2024.github.io/mobed-beijing/'},
-        {id:uid(),label:'MobED Official Site',url:'https://www.motortrend.com/news/'},
-      ],
-      createdAt:Date.now()-172800000
-    },
-    {
-      id:uid(), name:'Project Alpha', icon:'🚀', color:'#e8713a',
-      desc:'Main product launch campaign — Q2 deliverables and creative milestones.',
-      pwHash:hp('alpha123'),
-      tasks:[
-        {id:uid(),text:'Define project scope and objectives',done:true},
-        {id:uid(),text:'Create initial wireframes',done:true},
-        {id:uid(),text:'Stakeholder review session',done:false},
-        {id:uid(),text:'Finalize design system',done:false},
-      ],
-      notes:'Project kickoff confirmed.\n\nKey milestones:\n— Research: Week 1–2\n— Design: Week 3–5\n— Delivery: Week 6\n\nContact: Marc / FLOVAH',
-      progress:50, autoProgress:false,
-      files:[
-        {id:uid(),label:'Project Brief',url:'https://example.com/brief.pdf'},
-        {id:uid(),label:'Figma Mockups',url:'https://figma.com'},
-      ],
-      createdAt:Date.now()-864000000
-    },
-    {
-      id:uid(), name:'Project Beta', icon:'🎨', color:'#d4a843',
-      desc:'Brand identity redesign — visual language, style guide, and assets.',
-      pwHash:hp('beta456'),
-      tasks:[
-        {id:uid(),text:'Competitive brand analysis',done:true},
-        {id:uid(),text:'Mood board creation',done:false},
-        {id:uid(),text:'Logo concepts — 3 directions',done:false},
-      ],
-      notes:'Client prefers dark, premium aesthetic.\nMinimal color palette — black + gold.',
-      progress:33, autoProgress:false,
-      files:[{id:uid(),label:'Brand Guidelines v1',url:'https://example.com/brand.pdf'}],
-      createdAt:Date.now()-432000000
-    },
-    {
-      id:uid(), name:'Project Gamma', icon:'📱', color:'#e8713a',
-      desc:'Mobile app build — iOS & Android cross-platform with React Native.',
-      pwHash:hp('gamma789'),
-      tasks:[
-        {id:uid(),text:'Technical architecture planning',done:false},
-        {id:uid(),text:'Set up dev environment',done:false},
-        {id:uid(),text:'API integration spec',done:false},
-        {id:uid(),text:'UI component library',done:false},
-        {id:uid(),text:'Beta testing plan',done:false},
-      ],
-      notes:'Cross-platform: React Native.\nTarget launch: Q3.\n\nTeam: Dev ×2, Design ×1, PM ×1',
-      progress:0, autoProgress:false,
-      files:[],
-      createdAt:Date.now()-172800000
-    }
-  ];
+  projects = [];
   persist();
 }
 
