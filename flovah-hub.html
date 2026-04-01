@@ -3091,6 +3091,8 @@ document.getElementById('phaseBar').addEventListener('input', function(e) {
     _syncDebounce = setTimeout(syncMilestones, 200);
   }
 
+  var _lastClickX = 0, _lastClickY = 0;
+
   function openPopup(dateEl) {
     if (!popup) popup = createPopup();
     currentTarget = dateEl;
@@ -3112,20 +3114,21 @@ document.getElementById('phaseBar').addEventListener('input', function(e) {
 
     renderGrid();
 
-    // Position near the date element
-    var rect = dateEl.getBoundingClientRect();
-    popup.style.left = rect.left + 'px';
-    popup.style.top = (rect.bottom + 8) + 'px';
+    // Position directly at click location
+    var scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+    var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    popup.style.left = (_lastClickX + scrollX) + 'px';
+    popup.style.top = (_lastClickY + scrollY + 12) + 'px';
 
     // Ensure popup stays in viewport
     popup.classList.add('show');
     requestAnimationFrame(function() {
       var pr = popup.getBoundingClientRect();
       if (pr.right > window.innerWidth - 12) {
-        popup.style.left = Math.max(8, window.innerWidth - pr.width - 12) + 'px';
+        popup.style.left = Math.max(8, _lastClickX + scrollX - pr.width) + 'px';
       }
       if (pr.bottom > window.innerHeight - 12) {
-        popup.style.top = (rect.top - pr.height - 8) + 'px';
+        popup.style.top = (_lastClickY + scrollY - pr.height - 8) + 'px';
       }
     });
   }
@@ -3157,6 +3160,8 @@ document.getElementById('phaseBar').addEventListener('input', function(e) {
     if (dateEl && dateEl.closest('.phase-chip')) {
       e.preventDefault();
       e.stopPropagation();
+      _lastClickX = e.clientX;
+      _lastClickY = e.clientY;
       openPopup(dateEl);
       return;
     }
@@ -3320,6 +3325,14 @@ function persist() {
   try { localStorage.setItem(SK, JSON.stringify(projects)); } catch(e){}
 }
 function hydrate() {
+  // One-time reset: clear legacy sample projects
+  var resetKey = SK + '_v7_reset';
+  try {
+    if (!localStorage.getItem(resetKey)) {
+      localStorage.removeItem(SK);
+      localStorage.setItem(resetKey, '1');
+    }
+  } catch(e) {}
   try {
     const r = localStorage.getItem(SK);
     if (r) projects = JSON.parse(r);
