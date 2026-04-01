@@ -450,6 +450,12 @@ main { flex:1; padding:36px 32px; }
 }
 .pw-title { font-family:'Noto Sans',sans-serif; font-size:22px; font-weight:700; color:#fff; margin-bottom:6px; }
 .pw-sub { font-size:13px; color:var(--text-dim); }
+.pw-role-tabs { display:flex; gap:4px; margin-top:16px; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px; }
+.pw-role-tab { flex:1; padding:8px 0; border:none; border-radius:8px; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; font-family:'Noto Sans',sans-serif; letter-spacing:0.5px; cursor:pointer; transition:all 0.2s; }
+.pw-role-tab.active { background:var(--orange); color:#0a0a0a; }
+.pw-role-tab:not(.active):hover { color:#fff; background:rgba(255,255,255,0.06); }
+.pw-role-section { display:none; }
+.pw-role-section.active { display:block; }
 .form-field { margin-bottom:14px; }
 .field-label { display:block; font-size:11px; font-weight:600; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
 .input-wrap { position:relative; }
@@ -1192,20 +1198,50 @@ textarea.form-input { min-height:80px; resize:vertical; line-height:1.6; }
     <div class="pw-center">
       <div class="pw-proj-icon" id="pwIcon">🔒</div>
       <div class="pw-title" id="pwTitle">Project</div>
-      <div class="pw-sub" id="pwSub">Enter password to access</div>
-    </div>
-    <div class="form-field">
-      <label class="field-label">Password</label>
-      <div class="input-wrap">
-        <input class="field-input" type="password" id="pwInput" placeholder="Enter password…" autocomplete="off"/>
-        <button class="eye-btn" onclick="toggleEye('pwInput',this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
+      <div class="pw-sub" id="pwSub">Choose your access level</div>
+      <div class="pw-role-tabs">
+        <button class="pw-role-tab active" onclick="switchPwRole('admin')">🔑 Admin</button>
+        <button class="pw-role-tab" onclick="switchPwRole('client')">👤 Client</button>
       </div>
-      <div class="err-msg" id="pwErr"></div>
-      <div class="hint-msg" id="pwHint"></div>
     </div>
-    <button class="btn-primary" onclick="doUnlock()">Unlock Project</button>
+
+    <!-- Admin Login -->
+    <div class="pw-role-section active" id="pwAdminSection">
+      <div class="form-field">
+        <label class="field-label">Admin Password</label>
+        <div class="input-wrap">
+          <input class="field-input" type="password" id="pwInput" placeholder="Enter admin password…" autocomplete="off"/>
+          <button class="eye-btn" onclick="toggleEye('pwInput',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="err-msg" id="pwErr"></div>
+        <div class="hint-msg" id="pwHint"></div>
+      </div>
+      <button class="btn-primary" onclick="doUnlock()">Unlock Project</button>
+    </div>
+
+    <!-- Client Login -->
+    <div class="pw-role-section" id="pwClientSection">
+      <div class="form-field">
+        <label class="field-label">Username</label>
+        <div class="input-wrap">
+          <input class="field-input" type="text" id="pwClientUser" placeholder="Enter username…" autocomplete="off"/>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Password</label>
+        <div class="input-wrap">
+          <input class="field-input" type="password" id="pwClientPass" placeholder="Enter password…" autocomplete="off"/>
+          <button class="eye-btn" onclick="toggleEye('pwClientPass',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="err-msg" id="pwClientErr"></div>
+      </div>
+      <button class="btn-primary" onclick="doClientUnlock()">Enter as Client</button>
+    </div>
+
     <button class="btn-ghost" onclick="closeOv('pwOverlay')">Cancel</button>
   </div>
 </div>
@@ -3573,15 +3609,36 @@ function cardClick(id) {
   else openPwModal(id);
 }
 
+function switchPwRole(role) {
+  document.querySelectorAll('.pw-role-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.pw-role-section').forEach(function(s) { s.classList.remove('active'); });
+  if (role === 'client') {
+    document.querySelectorAll('.pw-role-tab')[1].classList.add('active');
+    document.getElementById('pwClientSection').classList.add('active');
+    setTimeout(function() { document.getElementById('pwClientUser').focus(); }, 100);
+  } else {
+    document.querySelectorAll('.pw-role-tab')[0].classList.add('active');
+    document.getElementById('pwAdminSection').classList.add('active');
+    setTimeout(function() { document.getElementById('pwInput').focus(); }, 100);
+  }
+}
+
 function openPwModal(id) {
   curPwId = id;
   const p = getP(id);
   document.getElementById('pwIcon').textContent = p.icon;
   document.getElementById('pwTitle').textContent = p.name;
-  document.getElementById('pwSub').textContent = 'Enter your password to access this project';
+  document.getElementById('pwSub').textContent = 'Choose your access level';
+  // Reset admin fields
   document.getElementById('pwInput').value = '';
   document.getElementById('pwErr').style.display = 'none';
   document.getElementById('pwHint').textContent = '';
+  // Reset client fields
+  document.getElementById('pwClientUser').value = '';
+  document.getElementById('pwClientPass').value = '';
+  document.getElementById('pwClientErr').style.display = 'none';
+  // Reset to admin tab
+  switchPwRole('admin');
   openOv('pwOverlay');
   setTimeout(()=>document.getElementById('pwInput').focus(),320);
 }
@@ -3606,8 +3663,41 @@ function doUnlock() {
   }
 }
 
+function doClientUnlock() {
+  const p = getP(curPwId);
+  if (!p || !p.clientCredentials) {
+    showClientPwErr('No client access configured for this project.');
+    return;
+  }
+  const user = document.getElementById('pwClientUser').value.trim();
+  const pass = document.getElementById('pwClientPass').value;
+  if (!user) { showClientPwErr('Please enter your username.'); return; }
+  if (!pass) { showClientPwErr('Please enter your password.'); return; }
+  if (user === p.clientCredentials.username && pass === p.clientCredentials.password) {
+    closeOv('pwOverlay');
+    // Enter client mode for this project
+    window._clientProject = p;
+    window._clientProjectId = p.id;
+    const main = document.getElementById('main');
+    if (main) main.style.display = 'none';
+    _showSplashTransition(p);
+  } else {
+    showClientPwErr('Incorrect username or password.');
+    document.getElementById('pwClientPass').value = '';
+    document.getElementById('pwClientPass').focus();
+    const m = document.querySelector('#pwOverlay .pw-modal');
+    m.style.transition='none'; m.style.transform='translateX(-10px) scale(1)';
+    setTimeout(()=>{ m.style.transition='transform 0.3s ease'; m.style.transform=''; },120);
+  }
+}
+
 function showPwErr(msg) {
   const e = document.getElementById('pwErr');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+function showClientPwErr(msg) {
+  const e = document.getElementById('pwClientErr');
   e.textContent = msg; e.style.display = 'block';
 }
 
@@ -4407,8 +4497,10 @@ function saveConfirmAction(action) {
 document.addEventListener('keydown',e=>{
   if (e.key==='Escape')
     ['panelOv','pwOverlay','newOv'].forEach(id=>{ if(document.getElementById(id).classList.contains('open')) closeOv(id); });
-  if (e.key==='Enter' && document.getElementById('pwOverlay').classList.contains('open'))
-    doUnlock();
+  if (e.key==='Enter' && document.getElementById('pwOverlay').classList.contains('open')) {
+    if (document.getElementById('pwClientSection').classList.contains('active')) doClientUnlock();
+    else doUnlock();
+  }
 });
 
 // ── EYE TOGGLE ────────────────────────────────────────
